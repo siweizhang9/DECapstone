@@ -1,9 +1,8 @@
 ## Airflow ETL Project
 This is an ETL (Extract, Transform, Load) project that loads and transforms data in Redshift with Airflow. This project has customized Airflow operators: stage_redshift.py, load_dimensions.py, load_fact.py, and data_quality.py. The project consists of the following files:
 
-* main.py - the main DAG (Directed Acyclic Graph) file that defines the tasks and dependencies for the ETL process.
-* sql_queries.py - contains all the SQL statements used in the project.
-* helpers.py - contains helper functions used in the project.
+* dags/main.py - the main DAG (Directed Acyclic Graph) file that defines the tasks and dependencies for the ETL process.
+* helpers/sql_queries.py - contains all the SQL statements used in the project.
 * plugins/operators/stage_redshift.py - the Airflow custom operator for staging data in Redshift.
 * plugins/operators/load_dimensions.py - the Airflow custom operator for loading dimensional data in Redshift.
 * plugins/operators/load_fact.py - the Airflow custom operator for loading fact data in Redshift.
