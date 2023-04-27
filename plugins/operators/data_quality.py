@@ -12,23 +12,41 @@ class DataQualityOperator(BaseOperator):
                  # Example:
                  # conn_id = your-connection-name
                  redshift_conn_id="",
-                 table="",
+                 dq_checks=[],
                  *args, **kwargs):
 
         super(DataQualityOperator, self).__init__(*args, **kwargs)
         # Map params here
         # Example:
         # self.conn_id = conn_id
-        self.table = table
+        self.dq_checks = dq_checks
         self.redshift_conn_id = redshift_conn_id
 
     def execute(self, context):
         # self.log.info('DataQualityOperator not implemented yet')
+        # define compare function to pass the dq_checks paremeters
+        def compare(a, b, comparison_symbol):
+            if comparison_symbol == ">":
+                return a > b
+            elif comparison_symbol == ">=":
+                return a >= b
+            elif comparison_symbol == "<":
+                return a < b
+            elif comparison_symbol == "<=":
+                return a <= b
+            elif comparison_symbol == "==":
+                return a == b
+            elif comparison_symbol == "!=":
+                return a != b
+            else:
+                raise ValueError(f"Invalid comparison symbol: {comparison_symbol}")
+            
         redshift_hook = PostgresHook(self.redshift_conn_id)
-        records = redshift_hook.get_records(f"SELECT COUNT(*) FROM {self.table}")
-        if len(records) < 1 or len(records[0]) < 1:
-            raise ValueError(f"Data quality check failed. {self.table} returned no results")
-        num_records = records[0][0]
-        if num_records < 1:
-            raise ValueError(f"Data quality check failed. {self.table} contained 0 rows")
-        self.log.info(f"Data quality on table {self.table} check passed with {records[0][0]} records")
+
+        for i, dq_check in enumerate(self.dq_checks):
+            records = redshift_hook.get_records(dq_check['test_sql'])
+            num_records = records[0][0]
+            if not compare(num_records, dq_check['expected'], dq_check['comparison']):
+                raise ValueError(f"Data quality check #{i} failed, {dq_check['error']}")
+            else:
+                 self.log.info(f"Data quality check #{i} succeeded")
