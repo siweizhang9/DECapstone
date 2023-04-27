@@ -36,7 +36,7 @@ dag = DAG('udac_example_dag',
     
 # start_operator = DummyOperator(task_id='Begin_execution',  dag=dag)
 
-create_all_tables = PostgresOperator(
+start_operator = PostgresOperator(
     task_id="Begin_execution",
     dag=dag,
     postgres_conn_id="redshift",
@@ -51,7 +51,8 @@ stage_events_to_redshift = StageToRedshiftOperator(
     table="public.staging_events",
     s3_bucket=s3_bucket,
     s3_key=LOG_DATA_KEY,
-    s3_json_path = LOG_JSONPATH
+    s3_json_path = LOG_JSONPATH,
+    s3_region = 'us-west-2'
 )
 
 stage_songs_to_redshift = StageToRedshiftOperator(
@@ -62,7 +63,8 @@ stage_songs_to_redshift = StageToRedshiftOperator(
     table="public.staging_songs",
     s3_bucket=s3_bucket,
     s3_key=SONG_DATA_KEY,
-    s3_json_path = SONG_JSONPATH
+    s3_json_path = SONG_JSONPATH,
+    s3_region = 'us-west-2'
 )
 
 
@@ -82,7 +84,8 @@ load_user_dimension_table = LoadDimensionOperator(
     redshift_conn_id="redshift",
     dim_table="users",
     dim_columns="userid, first_name, last_name, gender, level",
-    select_from_sql=SqlQueries.user_table_insert
+    select_from_sql=SqlQueries.user_table_insert,
+    truncate_boolean=True
 )
 
 
@@ -92,7 +95,8 @@ load_song_dimension_table = LoadDimensionOperator(
     redshift_conn_id="redshift",
     dim_table="songs",
     dim_columns="songid, title, artistid, year, duration",
-    select_from_sql=SqlQueries.song_table_insert
+    select_from_sql=SqlQueries.song_table_insert,
+    truncate_boolean=True
 )
 
 load_artist_dimension_table = LoadDimensionOperator(
@@ -101,7 +105,8 @@ load_artist_dimension_table = LoadDimensionOperator(
     redshift_conn_id="redshift",
     dim_table="artists",
     dim_columns="artistid, name, location, lattitude, longitude",
-    select_from_sql=SqlQueries.artist_table_insert
+    select_from_sql=SqlQueries.artist_table_insert,
+    truncate_boolean=True
 )
 
 load_time_dimension_table = LoadDimensionOperator(
@@ -110,20 +115,42 @@ load_time_dimension_table = LoadDimensionOperator(
     redshift_conn_id="redshift",
     dim_table="time",
     dim_columns="start_time, hour, day, week, month, year, weekday",
-    select_from_sql=SqlQueries.time_table_insert
+    select_from_sql=SqlQueries.time_table_insert,
+    truncate_boolean=True
 )
+
+# Provide a data qualicy check dictionary here with these elements:
+# "test_sql": the sql commend to run and return a single value that can be used as indicator
+#             for example: "SELECT COUNT(*) FROM..."
+# "expected": the value that is to be valued againt the indicator
+# "comparison": allowable comparison symbols are: >, >=, <, <=, ==, !=
+# "error": if the indicator from test_sql compared with expected using the comparison symbol
+#          returned False, what error message should be raised
+
+dq_checks = [
+    {'test_sql': "SELECT COUNT(*) FROM artists",
+     'expected': 0,
+     'comparison': ">",
+     'error': "there are no data on the artists table"
+     },
+    {'test_sql': "SELECT COUNT(*) FROM songs",
+     'expected': 0,
+     'comparison': ">",
+     'error': "there are no data on the songs table!"
+     }
+]
 
 run_quality_checks = DataQualityOperator(
     task_id='Run_data_quality_checks',
     dag=dag,
-    table="public.songplays",
+    dq_checks = dq_checks,
     redshift_conn_id="redshift"
 )
 
 end_operator = DummyOperator(task_id='Stop_execution',  dag=dag)
 
-create_all_tables >> stage_events_to_redshift
-create_all_tables >> stage_songs_to_redshift
+start_operator >> stage_events_to_redshift
+start_operator >> stage_songs_to_redshift
 stage_events_to_redshift >> load_songplays_table
 stage_songs_to_redshift >> load_songplays_table
 load_songplays_table >> load_song_dimension_table
