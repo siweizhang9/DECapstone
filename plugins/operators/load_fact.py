@@ -35,8 +35,11 @@ class LoadFactOperator(BaseOperator):
     def execute(self, context):
         redshift = PostgresHook(postgres_conn_id=self.redshift_conn_id)
 
-        self.log.info("Clearing data from destination Redshift table")
-        redshift.run("DELETE FROM {}".format(self.fact_table))
+        # Count rows in current dimension table and document
+        
+        records = redshift.get_records(f"SELECT COUNT(*) FROM {self.fact_table}")
+        og_num_records = records[0][0]
+        self.log.info(f"Counted {og_num_records} of rows in Redshift")
 
         self.log.info("loading data from staging tables to fact table")
         formatted_sql = LoadFactOperator.load_fact_sql_template.format(
@@ -47,7 +50,7 @@ class LoadFactOperator(BaseOperator):
         redshift.run(formatted_sql)
         records = redshift.get_records(f"SELECT COUNT(*) FROM {self.fact_table}")
         num_records = records[0][0]
-        self.log.info(f"Inserted {num_records} of rows to Redshift")
+        self.log.info(f"Inserted {num_records - og_num_records} of rows to Redshift")
 
 
 
