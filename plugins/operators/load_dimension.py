@@ -29,6 +29,7 @@ class LoadDimensionOperator(BaseOperator):
                  dim_table="",
                  dim_columns="",
                  select_from_sql="",
+                 truncate_boolean="",
                  *args, **kwargs):
 
         super(LoadDimensionOperator, self).__init__(*args, **kwargs)
@@ -39,12 +40,23 @@ class LoadDimensionOperator(BaseOperator):
         self.redshift_conn_id = redshift_conn_id
         self.select_from_sql = select_from_sql
         self.dim_columns = dim_columns
+        self.truncate_boolean = truncate_boolean
 
     def execute(self, context):
         redshift = PostgresHook(postgres_conn_id=self.redshift_conn_id)
 
-        self.log.info("Clearing data from destination Redshift table")
-        redshift.run("DELETE FROM {}".format(self.dim_table))
+        # Count rows in current dimension table and document
+        
+        records = redshift.get_records(f"SELECT COUNT(*) FROM {self.dim_table}")
+        og_num_records = records[0][0]
+        self.log.info(f"Counted {og_num_records} of rows in Redshift")
+
+        # use truncate_boolean to switch between append-only or delete-load
+
+        if self.truncate_boolean:
+            self.log.info("Clearing data from destination Redshift table")
+            redshift.run("DELETE FROM {}".format(self.dim_table))
+            og_num_records = 0
 
         self.log.info("loading data from staging tables to dimension table")
         formatted_sql = LoadDimensionOperator.load_dim_sql_template.format(
@@ -61,4 +73,4 @@ class LoadDimensionOperator(BaseOperator):
         redshift.run(distinct_sql)
         records = redshift.get_records(f"SELECT COUNT(*) FROM {self.dim_table}")
         num_records = records[0][0]
-        self.log.info(f"Inserted {num_records} of rows to Redshift")
+        self.log.info(f"Inserted {num_records - og_num_records} of rows to Redshift")
