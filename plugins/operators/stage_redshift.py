@@ -9,6 +9,7 @@ class StageToRedshiftOperator(BaseOperator):
     copy_sql = """
         COPY {}
         FROM '{}'
+        REGION '{}'
         ACCESS_KEY_ID '{}'
         SECRET_ACCESS_KEY '{}'
         json '{}'
@@ -24,6 +25,7 @@ class StageToRedshiftOperator(BaseOperator):
                  aws_credentials_id="",
                  table="",
                  s3_bucket="",
+                 s3_region="",
                  s3_key="",
                  s3_json_path = "",
                  *args, **kwargs):
@@ -38,6 +40,7 @@ class StageToRedshiftOperator(BaseOperator):
         self.s3_key = s3_key
         self.s3_json_path = s3_json_path
         self.aws_credentials_id = aws_credentials_id
+        self.s3_region = s3_region
 
     def execute(self, context):
         aws_hook = AwsHook(self.aws_credentials_id)
@@ -53,6 +56,7 @@ class StageToRedshiftOperator(BaseOperator):
         formatted_sql = StageToRedshiftOperator.copy_sql.format(
             self.table,
             s3_path,
+            self.s3_region,
             credentials.access_key,
             credentials.secret_key,
             self.s3_json_path
