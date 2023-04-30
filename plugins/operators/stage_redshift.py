@@ -12,7 +12,9 @@ class StageToRedshiftOperator(BaseOperator):
         REGION '{}'
         ACCESS_KEY_ID '{}'
         SECRET_ACCESS_KEY '{}'
-        json '{}'
+        FORMAT CSV
+        DELIMITER ','
+        IGNOREHEADER 1
     """
     ui_color = '#358140'
 
@@ -27,7 +29,6 @@ class StageToRedshiftOperator(BaseOperator):
                  s3_bucket="",
                  s3_region="",
                  s3_key="",
-                 s3_json_path = "",
                  *args, **kwargs):
 
         super(StageToRedshiftOperator, self).__init__(*args, **kwargs)
@@ -38,7 +39,6 @@ class StageToRedshiftOperator(BaseOperator):
         self.redshift_conn_id = redshift_conn_id
         self.s3_bucket = s3_bucket
         self.s3_key = s3_key
-        self.s3_json_path = s3_json_path
         self.aws_credentials_id = aws_credentials_id
         self.s3_region = s3_region
 
@@ -58,14 +58,12 @@ class StageToRedshiftOperator(BaseOperator):
             s3_path,
             self.s3_region,
             credentials.access_key,
-            credentials.secret_key,
-            self.s3_json_path
+            credentials.secret_key
         )
         redshift.run(formatted_sql)        
         records = redshift.get_records(f"SELECT COUNT(*) FROM {self.table}")
         num_records = records[0][0]
         self.log.info(f"Copied {num_records} of rows to Redshift")
-
 
 
 
