@@ -1,130 +1,184 @@
 class SqlQueries:
-    songplay_table_insert = ("""
-        SELECT
-                md5(events.sessionid || events.start_time) songplay_id,
-                events.start_time, 
-                events.userid, 
-                events.level, 
-                songs.song_id, 
-                songs.artist_id, 
-                events.sessionid, 
-                events.location, 
-                events.useragent
-                FROM (SELECT TIMESTAMP 'epoch' + ts/1000 * interval '1 second' AS start_time, *
-            FROM staging_events
-            WHERE page='NextSong') events
-            LEFT JOIN staging_songs songs
-            ON events.song = songs.title
-                AND events.artist = songs.artist_name
-                AND events.length = songs.duration
+    flights_fact_table_insert = ("""
+
+    SELECT 
+      DEPARTURES_SCHEDULED, DEPARTURES_PERFORMED, PAYLOAD, SEATS, 
+      PASSENGERS, FREIGHT, MAIL, DISTANCE, RAMP_TO_RAMP, AIR_TIME, 
+      UNIQUE_CARRIER_ENTITY, ORIGIN, DEST, AIRCRAFT_TYPE, AIRCRAFT_CONFIG,
+      YEAR, QUARTER, MONTH, DISTANCE_GROUP, CLASS, DATA_SOURCE
+    FROM staging_flights
+    """
+    )
+
+    dim_aircraft_code_insert = ("""
+    SELECT ac_typeid, ac_group, ssd_name, manufacturer, long_name, short_name
+    FROM staging_aircraft_code    
     """)
 
-    user_table_insert = ("""
-        SELECT distinct userid, firstname, lastname, gender, level
-        FROM staging_events
-        WHERE page='NextSong'
+    dim_airport_group_insert = ("""
+    SELECT ac_group, ac_group_description
+    FROM staging_aircraft_group
     """)
 
-    song_table_insert = ("""
-        SELECT distinct song_id, title, artist_id, year, duration
-        FROM staging_songs
+    dim_origin_airport_code_insert = ("""
+    SELECT ORIGIN_airport_id, ORIGIN_airport_seq_id, ORIGIN_city_market_id, 
+    ORIGIN, ORIGIN_city_name, ORIGIN_state_abr, ORIGIN_state_fips, 
+    ORIGIN_state_nm, ORIGIN_country, ORIGIN_country_name, ORIGIN_wac
+    FROM staging_flights
     """)
 
-    artist_table_insert = ("""
-        SELECT distinct artist_id, artist_name, artist_location, artist_latitude, artist_longitude
-        FROM staging_songs
+    dim_destination_airport_code_insert = ("""
+    SELECT DEST_airport_id, DEST_airport_seq_id, DEST_city_market_id, 
+    DEST, DEST_city_name, DEST_state_abr, DEST_state_fips, 
+    DEST_state_nm, DEST_country, DEST_country_name, DEST_wac
+    FROM staging_flights
     """)
 
-    time_table_insert = ("""
-        SELECT start_time, extract(hour from start_time), extract(day from start_time), extract(week from start_time), 
-               extract(month from start_time), extract(year from start_time), extract(dayofweek from start_time)
-        FROM songplays
-    """)
+    dim_aircraft_config_insert = (
+        """
+    SELECT ac_config, ac_config_description
+    FROM staging_aircraft_configuration
+        """
+    )
 
     create_all_tables =(
-        """
-    CREATE TABLE IF NOT EXISTS public.artists (
-	artistid varchar(256) NOT NULL,
-	name varchar(256),
-	location varchar(256),
-	lattitude numeric(18,0),
-	longitude numeric(18,0)
+        """      
+    
+    CREATE TABLE IF NOT EXISTS public.staging_flights (
+      DEPARTURES_SCHEDULED DECIMAL(12,2),
+      DEPARTURES_PERFORMED DECIMAL(12,2),
+      PAYLOAD DECIMAL(12,2),
+      SEATS DECIMAL(12,2),
+      PASSENGERS DECIMAL(12,2),
+      FREIGHT DECIMAL(12,2),
+      MAIL DECIMAL(12,2),
+      DISTANCE DECIMAL(12,2),
+      RAMP_TO_RAMP DECIMAL(12,2),
+      AIR_TIME DECIMAL(12,2),
+      UNIQUE_CARRIER TEXT,
+      AIRLINE_ID INT,
+      UNIQUE_CARRIER_NAME TEXT,
+      UNIQUE_CARRIER_ENTITY TEXT,
+      REGION CHAR(1),
+      CARRIER CHAR(3),
+      CARRIER_NAME TEXT,
+      CARRIER_GROUP INT,
+      CARRIER_GROUP_NEW INT,
+      ORIGIN_AIRPORT_ID INT,
+      ORIGIN_AIRPORT_SEQ_ID INT,
+      ORIGIN_CITY_MARKET_ID INT,
+      ORIGIN CHAR(3),
+      ORIGIN_CITY_NAME TEXT,
+      ORIGIN_STATE_ABR CHAR(2),
+      ORIGIN_STATE_FIPS INT,
+      ORIGIN_STATE_NM TEXT,
+      ORIGIN_COUNTRY CHAR(2),
+      ORIGIN_COUNTRY_NAME TEXT,
+      ORIGIN_WAC INT,
+      DEST_AIRPORT_ID INT,
+      DEST_AIRPORT_SEQ_ID INT,
+      DEST_CITY_MARKET_ID INT,
+      DEST CHAR(3),
+      DEST_CITY_NAME TEXT,
+      DEST_STATE_ABR CHAR(2),
+      DEST_STATE_FIPS INT,
+      DEST_STATE_NM TEXT,
+      DEST_COUNTRY CHAR(2),
+      DEST_COUNTRY_NAME TEXT,
+      DEST_WAC INT,
+      AIRCRAFT_GROUP INT,
+      AIRCRAFT_TYPE INT,
+      AIRCRAFT_CONFIG INT,
+      YEAR INT,
+      QUARTER INT,
+      MONTH INT,
+      DISTANCE_GROUP INT,
+      CLASS CHAR(1),
+      DATA_SOURCE CHAR(2)
     );
 
-    CREATE TABLE IF NOT EXISTS public.songplays (
-        playid varchar(32) NOT NULL,
-        start_time timestamp NOT NULL,
-        userid int4 NOT NULL,
-        "level" varchar(256),
-        songid varchar(256),
-        artistid varchar(256),
-        sessionid int4,
-        location varchar(256),
-        user_agent varchar(256),
-        CONSTRAINT songplays_pkey PRIMARY KEY (playid)
+
+    CREATE TABLE IF NOT EXISTS public.staging_aircraft_code (
+      AC_TYPEID INT,
+      AC_GROUP INT,
+      SSD_NAME VARCHAR(50),
+      MANUFACTURER VARCHAR(50),
+      LONG_NAME VARCHAR(50),
+      SHORT_NAME VARCHAR(50),
+      BEGIN_DATE VARCHAR(50),
+      END_DATE VARCHAR(50)
     );
 
-    CREATE TABLE IF NOT EXISTS public.songs (
-        songid varchar(256) NOT NULL,
-        title varchar(256),
-        artistid varchar(256),
-        "year" int4,
-        duration numeric(18,0),
-        CONSTRAINT songs_pkey PRIMARY KEY (songid)
+    
+    CREATE TABLE IF NOT EXISTS public.staging_aircraft_group (
+      AC_GROUP INT NOT NULL,
+      AC_GROUP_DESCRIPTION TEXT
     );
 
-    CREATE TABLE IF NOT EXISTS public.staging_events (
-        artist varchar(256),
-        auth varchar(256),
-        firstname varchar(256),
-        gender varchar(256),
-        iteminsession int4,
-        lastname varchar(256),
-        length numeric(18,0),
-        "level" varchar(256),
-        location varchar(256),
-        "method" varchar(256),
-        page varchar(256),
-        registration numeric(18,0),
-        sessionid int4,
-        song varchar(256),
-        status int4,
-        ts int8,
-        useragent varchar(256),
-        userid int4
+    CREATE TABLE IF NOT EXISTS public.staging_aircraft_configuration (
+      AC_CONFIG INT NOT NULL,
+      AC_CONFIG_DESCRIPTION TEXT
     );
 
-    CREATE TABLE IF NOT EXISTS public.staging_songs (
-        num_songs int4,
-        artist_id varchar(256),
-        artist_name varchar(256),
-        artist_latitude numeric(18,0),
-        artist_longitude numeric(18,0),
-        artist_location varchar(256),
-        song_id varchar(256),
-        title varchar(256),
-        duration numeric(18,0),
-        "year" int4
+    CREATE TABLE IF NOT EXISTS public.dim_aircraft_code (
+      ac_typeid INT NOT NULL,
+      ac_group INT,
+      ssd_name VARCHAR(50),
+      manufacturer VARCHAR(50),
+      long_name VARCHAR(50),
+      short_name VARCHAR(50)
     );
 
-    CREATE TABLE IF NOT EXISTS public."time" (
-        start_time timestamp NOT NULL,
-        "hour" int4,
-        "day" int4,
-        week int4,
-        "month" varchar(256),
-        "year" int4,
-        weekday varchar(256),
-        CONSTRAINT time_pkey PRIMARY KEY (start_time)
+    CREATE TABLE IF NOT EXISTS public.dim_aircraft_group (
+      ac_group INT,
+      ac_group_description TEXT
     );
 
-    CREATE TABLE IF NOT EXISTS public.users (
-        userid int4 NOT NULL,
-        first_name varchar(256),
-        last_name varchar(256),
-        gender varchar(256),
-        "level" varchar(256),
-        CONSTRAINT users_pkey PRIMARY KEY (userid)
+    
+    CREATE TABLE IF NOT EXISTS public.dim_airport_code (
+      airport_id INT,
+      airport_seq_id INT,
+      city_market_id INT,
+      airport_code CHAR(3),
+      city_name TEXT,
+      state_abr CHAR(2),
+      state_fips INT,
+      state_nm TEXT,
+      country CHAR(5),
+      country_name TEXT,
+      wac INT
+    );
+
+    
+    CREATE TABLE IF NOT EXISTS public.dim_aircraft_configuration (
+      ac_config INT,
+      ac_config_description TEXT
+    );
+
+
+
+    CREATE TABLE IF NOT EXISTS public.fact_flights (
+      DEPARTURES_SCHEDULED DECIMAL(12,2),
+      DEPARTURES_PERFORMED DECIMAL(12,2),
+      PAYLOAD DECIMAL(12,2),
+      SEATS DECIMAL(12,2),
+      PASSENGERS DECIMAL(12,2),
+      FREIGHT DECIMAL(12,2),
+      MAIL DECIMAL(12,2),
+      DISTANCE DECIMAL(12,2),
+      RAMP_TO_RAMP DECIMAL(12,2),
+      AIR_TIME DECIMAL(12,2),
+      UNIQUE_CARRIER_ENTITY TEXT,
+      ORIGIN CHAR(3),
+      DEST CHAR(3),
+      AIRCRAFT_TYPE INT,
+      AIRCRAFT_CONFIG INT,
+      YEAR INT,
+      QUARTER INT,
+      MONTH INT,
+      DISTANCE_GROUP INT,
+      CLASS CHAR(1),
+      DATA_SOURCE CHAR(2)
     );
     """
         )
