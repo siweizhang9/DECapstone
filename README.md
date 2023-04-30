@@ -14,8 +14,7 @@ I am using airflow to drive redshift to copy staging data from S3 to redshift th
 
 1. Flexibility: Airflow allows you to define and execute arbitrary workflows of data processing tasks, making it easy to adapt to different use cases and requirements.
 2. Scalability: Airflow can easily scale to handle large volumes of data processing tasks and complex workflows, and it can be integrated with other tools such as Kubernetes to run tasks in a distributed manner.
-3. Extensibility: Airflow can be extended with custom operators and sensors, allowing you to integrate it with a wide range of tools and technologies.![fact_flights](https://user-images.githubusercontent.com/31421213/235377816-13831162-baae-4a28-86e9-810be394afb8.jpg)
-
+3. Extensibility: Airflow can be extended with custom operators and sensors, allowing you to integrate it with a wide range of tools and technologies.
 4. Monitoring: Airflow provides a web interface for monitoring and managing workflows, making it easy to track the progress of data processing tasks and troubleshoot issues.
 5. Integration with Redshift: Airflow comes with built-in operators for interacting with Redshift, making it easy to copy data from S3 to Redshift and create fact tables and dimensions data from staging data.
 
