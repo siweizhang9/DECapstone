@@ -18,6 +18,18 @@ I am using airflow to drive redshift to copy staging data from S3 to redshift th
 4. Monitoring: Airflow provides a web interface for monitoring and managing workflows, making it easy to track the progress of data processing tasks and troubleshoot issues.
 5. Integration with Redshift: Airflow comes with built-in operators for interacting with Redshift, making it easy to copy data from S3 to Redshift and create fact tables and dimensions data from staging data.
 
+### Choices of data model
+I choose star schema for this data model for the following benefits comparing to the other ones:
+1. Simpler queries and easier to understand: With a star schema, you can avoid complex join statements and reduce query complexity. I work with team of analysts who are still new to SQL so this can help them do their job
+2. Improved performance: Because star schema tables are smaller and more denormalized, they can be indexed more efficiently, leading to faster query times.
+3. Flexibility: Star schema allows for more flexibility in adding new dimensions or changing existing ones, as well as accommodating new measures. I may later introduce more look up tables for other filed to enable new analysis. With star schema it's as easy as adding a new dimension table.
+
+One drawback of choosing star schema is that, it does requre a bit more maintainance as each tables (fact and dimension) need to be updated independently. But for this data model it's not too much of an issue. **As each data point is a monthly summary, this data should only need to be updated on a monthly basis.** 
+
+### Connections of entities within the data model
+All the dimension tables in this data models are all quite simple and have very clear index columns. There are not too much room for decision to make on how the fact table and dimension tables should be connected. 
+There is only one dimension table (airport code) that I do have to make a decision: between airport code ("LAX") and airport ID ("12896") I pick the former. There are no difference from technical perspective but for ease of reading the data model, I believe people can recognize LAX a lot better than 12896.
+
 ### Addressing Other Scenarios
 * The data was increased by 100x.
   1. Increase the number of nodes in the cluster: Redshift allows you to add more nodes to the cluster, which can increase the computing power of the cluster and handle larger amounts of data.
