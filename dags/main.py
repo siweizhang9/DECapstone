@@ -10,15 +10,16 @@ from helpers import SqlQueries
 
 # AWS_KEY = os.environ.get('AWS_KEY')
 # AWS_SECRET = os.environ.get('AWS_SECRET')
-s3_bucket = 'udacity-dend'
-LOG_DATA_KEY ='log_data'
-LOG_JSONPATH = 's3://udacity-dend/log_json_path.json'
-SONG_DATA_KEY = 'song_data'
-SONG_JSONPATH = 'auto'
+s3_bucket = 'decapstonesz'
+flight_data_key ='T_100'
+aircraft_code_key = 'Info/Aircraft Code.csv'
+aircraft_group_key = 'Info/L_AIRCRAFT_GROUP.csv'
+aircraft_config_key = 'Info/L_AIRCRAFT_CONFIG.csv'
+
 
 default_args = {
     'owner': 'udacity',
-    'start_date': datetime(2019, 1, 12),
+    'start_date': datetime(2022, 1, 1),
     'depends_on_past': False,
     'retries': 3,
     'retry_delay': timedelta(minutes=5),
@@ -28,13 +29,11 @@ default_args = {
 
 dag = DAG('udac_example_dag',
           default_args=default_args,
-          description='Load and transform data in Redshift with Airflow',
-          schedule_interval='0 * * * *',
+          description='Load and transform flight data in Redshift with Airflow',
+          schedule_interval='@monthly',
           max_active_runs=1
         )
-# Define Stage Operator
-    
-# start_operator = DummyOperator(task_id='Begin_execution',  dag=dag)
+
 
 start_operator = PostgresOperator(
     task_id="Begin_execution",
@@ -43,80 +42,112 @@ start_operator = PostgresOperator(
     sql=SqlQueries.create_all_tables
 )
 
-stage_events_to_redshift = StageToRedshiftOperator(
-    task_id='Stage_events',
+stage_flights_to_redshift = StageToRedshiftOperator(
+    task_id='Stage_flights',
     dag=dag,
     redshift_conn_id="redshift",
     aws_credentials_id="aws_credentials",
-    table="public.staging_events",
+    table="public.staging_flights",
     s3_bucket=s3_bucket,
-    s3_key=LOG_DATA_KEY,
-    s3_json_path = LOG_JSONPATH,
-    s3_region = 'us-west-2'
+    s3_key=flight_data_key,
+    s3_region = 'us-east-1'
 )
 
-stage_songs_to_redshift = StageToRedshiftOperator(
-    task_id='Stage_songs',
+stage_aircraft_code_to_redshift = StageToRedshiftOperator(
+    task_id='Stage_aircraft_code',
     dag=dag,
     redshift_conn_id="redshift",
     aws_credentials_id="aws_credentials",
-    table="public.staging_songs",
+    table="public.staging_aircraft_code",
     s3_bucket=s3_bucket,
-    s3_key=SONG_DATA_KEY,
-    s3_json_path = SONG_JSONPATH,
-    s3_region = 'us-west-2'
+    s3_key=aircraft_code_key,
+    s3_region = 'us-east-1'
 )
 
-
-load_songplays_table = LoadFactOperator(
-    task_id='Load_songplays_fact_table',
+stage_aircraft_group_to_redshift = StageToRedshiftOperator(
+    task_id='Stage_aircraft_group',
     dag=dag,
     redshift_conn_id="redshift",
-    fact_table="public.songplays",
-    fact_columns="playid, start_time, userid, level,\
-      songid, artistid, sessionid, location, user_agent",
-    select_from_sql=SqlQueries.songplay_table_insert
+    aws_credentials_id="aws_credentials",
+    table="public.staging_aircraft_group",
+    s3_bucket=s3_bucket,
+    s3_key=aircraft_group_key,
+    s3_region = 'us-east-1'
 )
 
-load_user_dimension_table = LoadDimensionOperator(
-    task_id='Load_user_dim_table',
+stage_aircraft_config_to_redshift = StageToRedshiftOperator(
+    task_id='Stage_aircraft_config',
     dag=dag,
     redshift_conn_id="redshift",
-    dim_table="users",
-    dim_columns="userid, first_name, last_name, gender, level",
-    select_from_sql=SqlQueries.user_table_insert,
+    aws_credentials_id="aws_credentials",
+    table="public.staging_aircraft_configuration",
+    s3_bucket=s3_bucket,
+    s3_key=aircraft_config_key,
+    s3_region = 'us-east-1'
+)
+
+load_flights_table = LoadFactOperator(
+    task_id='Load_flights_fact_table',
+    dag=dag,
+    redshift_conn_id="redshift",
+    fact_table="public.fact_flights",
+    fact_columns="DEPARTURES_SCHEDULED, DEPARTURES_PERFORMED, PAYLOAD, SEATS, \
+    PASSENGERS, FREIGHT, MAIL, DISTANCE, RAMP_TO_RAMP, AIR_TIME, \
+    UNIQUE_CARRIER_ENTITY, ORIGIN, DEST, AIRCRAFT_TYPE, AIRCRAFT_CONFIG, \
+    YEAR, QUARTER, MONTH, DISTANCE_GROUP, CLASS, DATA_SOURCE",
+    select_from_sql=SqlQueries.flights_fact_table_insert
+)
+
+load_dim_aircraft_code = LoadDimensionOperator(
+    task_id='load_dim_aircraft_code',
+    dag=dag,
+    redshift_conn_id="redshift",
+    dim_table="dim_aircraft_code",
+    dim_columns="ac_typeid, ac_group, ssd_name, manufacturer, long_name, short_name",
+    select_from_sql=SqlQueries.dim_aircraft_code_insert,
     truncate_boolean=True
 )
 
-
-load_song_dimension_table = LoadDimensionOperator(
-    task_id='Load_song_dim_table',
+load_dim_airport_group = LoadDimensionOperator(
+    task_id='load_dim_airport_group',
     dag=dag,
     redshift_conn_id="redshift",
-    dim_table="songs",
-    dim_columns="songid, title, artistid, year, duration",
-    select_from_sql=SqlQueries.song_table_insert,
+    dim_table="dim_aircraft_group",
+    dim_columns="ac_group, ac_group_description",
+    select_from_sql=SqlQueries.dim_airport_group_insert,
     truncate_boolean=True
 )
 
-load_artist_dimension_table = LoadDimensionOperator(
-    task_id='Load_artist_dim_table',
+load_dim_aircraft_config = LoadDimensionOperator(
+    task_id='load_dim_aircraft_config',
     dag=dag,
     redshift_conn_id="redshift",
-    dim_table="artists",
-    dim_columns="artistid, name, location, lattitude, longitude",
-    select_from_sql=SqlQueries.artist_table_insert,
+    dim_table="dim_aircraft_configuration",
+    dim_columns="ac_config, ac_config_description",
+    select_from_sql=SqlQueries.dim_aircraft_config_insert,
     truncate_boolean=True
 )
 
-load_time_dimension_table = LoadDimensionOperator(
-    task_id='Load_time_dim_table',
+load_origin_dim_airport_code = LoadDimensionOperator(
+    task_id='load_origin_dim_airport_code',
     dag=dag,
     redshift_conn_id="redshift",
-    dim_table="time",
-    dim_columns="start_time, hour, day, week, month, year, weekday",
-    select_from_sql=SqlQueries.time_table_insert,
+    dim_table="dim_airport_code",
+    dim_columns="airport_id, airport_seq_id, city_market_id, airport_code, city_name, \
+      state_abr, state_fips, state_nm, country, country_name, wac",
+    select_from_sql=SqlQueries.dim_origin_airport_code_insert,
     truncate_boolean=True
+)
+
+load_destin_dim_airport_code = LoadDimensionOperator(
+    task_id='load_destin_dim_airport_code',
+    dag=dag,
+    redshift_conn_id="redshift",
+    dim_table="dim_airport_code",
+    dim_columns="airport_id, airport_seq_id, city_market_id, airport_code, city_name, \
+      state_abr, state_fips, state_nm, country, country_name, wac",
+    select_from_sql=SqlQueries.dim_destination_airport_code_insert,
+    truncate_boolean=False
 )
 
 # Provide a data qualicy check dictionary here with these elements:
@@ -128,15 +159,20 @@ load_time_dimension_table = LoadDimensionOperator(
 #          returned False, what error message should be raised
 
 dq_checks = [
-    {'test_sql': "SELECT COUNT(*) FROM artists",
+    {'test_sql': "SELECT COUNT(*) FROM fact_flights WHERE year = 2020",
      'expected': 0,
      'comparison': ">",
-     'error': "there are no data on the artists table"
+     'error': "there are no data for 2020"
      },
-    {'test_sql': "SELECT COUNT(*) FROM songs",
+    {'test_sql': "SELECT COUNT(*) FROM staging_aircraft_code",
      'expected': 0,
      'comparison': ">",
-     'error': "there are no data on the songs table!"
+     'error': "there are no data on aircraft_code csv file"
+     },
+     {'test_sql': "SELECT COUNT(*) FROM staging_flights",
+     'expected': 0,
+     'comparison': ">",
+     'error': "there are no data on staging flights table"
      }
 ]
 
@@ -149,16 +185,18 @@ run_quality_checks = DataQualityOperator(
 
 end_operator = DummyOperator(task_id='Stop_execution',  dag=dag)
 
-start_operator >> stage_events_to_redshift
-start_operator >> stage_songs_to_redshift
-stage_events_to_redshift >> load_songplays_table
-stage_songs_to_redshift >> load_songplays_table
-load_songplays_table >> load_song_dimension_table
-load_songplays_table >> load_user_dimension_table
-load_songplays_table >> load_artist_dimension_table
-load_songplays_table >> load_time_dimension_table
-load_song_dimension_table >> run_quality_checks
-load_time_dimension_table >> run_quality_checks
-load_artist_dimension_table >> run_quality_checks
-load_user_dimension_table >> run_quality_checks
+start_operator >> stage_flights_to_redshift
+stage_flights_to_redshift >> stage_aircraft_group_to_redshift
+stage_aircraft_group_to_redshift >> stage_aircraft_code_to_redshift
+stage_aircraft_code_to_redshift >> stage_aircraft_config_to_redshift
+stage_aircraft_config_to_redshift >> load_flights_table
+load_flights_table >> load_dim_aircraft_code
+load_flights_table >> load_dim_airport_group
+load_flights_table >> load_dim_aircraft_config
+load_flights_table >> load_origin_dim_airport_code
+load_origin_dim_airport_code >> load_destin_dim_airport_code 
+load_dim_aircraft_code >> run_quality_checks
+load_dim_airport_group >> run_quality_checks
+load_dim_aircraft_config >> run_quality_checks
+load_destin_dim_airport_code >> run_quality_checks
 run_quality_checks >> end_operator
